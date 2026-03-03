@@ -553,6 +553,54 @@ export interface WorkspaceRule {
   createdAt: string;
 }
 
+// ─── File Explorer ──────────────────────────────────────────────────────────
+
+export const FileTreeNode: z.ZodType<{
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  size?: number;
+  children?: FileTreeNode[];
+}> = z.lazy(() =>
+  z.object({
+    name: z.string(),
+    path: z.string(),
+    type: z.enum(['file', 'directory']),
+    size: z.number().optional(),
+    children: z.array(FileTreeNode).optional(),
+  })
+);
+export type FileTreeNode = z.infer<typeof FileTreeNode>;
+
+export const FileTreeResponse = z.object({
+  branch: z.string(),
+  tree: z.array(FileTreeNode),
+});
+export type FileTreeResponse = z.infer<typeof FileTreeResponse>;
+
+export const FileContent = z.object({
+  path: z.string(),
+  content: z.string(),
+  language: z.string(),
+  size: z.number(),
+  encoding: z.enum(['utf-8', 'binary']),
+});
+export type FileContent = z.infer<typeof FileContent>;
+
+export const WriteFileRequest = z.object({
+  path: z.string().min(1),
+  content: z.string(),
+  docId: z.string().min(1),
+});
+export type WriteFileRequest = z.infer<typeof WriteFileRequest>;
+
+export const WriteFileResponse = z.object({
+  ok: z.boolean(),
+  path: z.string(),
+  size: z.number(),
+});
+export type WriteFileResponse = z.infer<typeof WriteFileResponse>;
+
 // ─── Security Constants ─────────────────────────────────────────────────────
 export const FORBIDDEN_PATH_PATTERNS = [
   /\.env($|\.)/,

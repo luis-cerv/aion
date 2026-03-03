@@ -35,6 +35,7 @@ import { AgentStorageService } from './storage/prisma.adapter';
 import { ClaudeCodeAdapter } from './llm/claude-code.adapter';
 import { RepoAdapter, slugify } from './repo/repo.adapter';
 import { RepoSecurityService } from './repo/security';
+import { FileExplorerService } from './repo/file-explorer.service';
 import { GitHubAppService } from './github/github-app.service';
 import { DocWriter } from '../../core/doc/writer';
 import { DocReader } from '../../core/doc/reader';
@@ -142,6 +143,7 @@ export class AgentPlatformService {
     private readonly claudeCode: ClaudeCodeAdapter,
     private readonly repo: RepoAdapter,
     private readonly security: RepoSecurityService,
+    private readonly fileExplorer: FileExplorerService,
     private readonly githubApp: GitHubAppService,
     private readonly docWriter: DocWriter,
     private readonly docReader: DocReader
@@ -696,6 +698,57 @@ export class AgentPlatformService {
     if (!target) throw new Error('No repo connected for this workspace');
     await this.repo.ensureRepo(target);
     return this.repo.commitAll(target.localPath, message);
+  }
+
+  // ─── File Explorer ──────────────────────────────────────────────────────
+
+  async getFileTree(workspaceId: string, docId?: string) {
+    const target = await this.getWorkspaceRepoTarget(workspaceId);
+    if (!target) throw new Error('No repo connected for this workspace');
+    await this.repo.ensureRepo(target);
+
+    let branch = '';
+    if (docId) {
+      branch = (await this.ensureDocBranch(workspaceId, docId)) ?? '';
+    } else {
+      const { execFile } = await import('node:child_process');
+      const { promisify } = await import('node:util');
+      const exec = promisify(execFile);
+      try {
+        const { stdout } = await exec('git', ['branch', '--show-current'], {
+          cwd: target.localPath,
+        });
+        branch = stdout.trim();
+      } catch {
+        branch = '';
+      }
+    }
+
+    const tree = await this.fileExplorer.getFileTree(target.localPath);
+    return { branch, tree };
+  }
+
+  async readRepoFile(workspaceId: string, filePath: string, docId?: string) {
+    const target = await this.getWorkspaceRepoTarget(workspaceId);
+    if (!target) throw new Error('No repo connected for this workspace');
+    await this.repo.ensureRepo(target);
+    if (docId) {
+      await this.ensureDocBranch(workspaceId, docId);
+    }
+    return this.fileExplorer.readFile(target.localPath, filePath);
+  }
+
+  async writeRepoFile(
+    workspaceId: string,
+    filePath: string,
+    content: string,
+    docId: string
+  ) {
+    const target = await this.getWorkspaceRepoTarget(workspaceId);
+    if (!target) throw new Error('No repo connected for this workspace');
+    await this.repo.ensureRepo(target);
+    await this.ensureDocBranch(workspaceId, docId);
+    return this.fileExplorer.writeFile(target.localPath, filePath, content);
   }
 
   // ─── Config ─────────────────────────────────────────────────────────────

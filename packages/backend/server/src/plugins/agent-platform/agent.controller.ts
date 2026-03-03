@@ -9,6 +9,7 @@ import {
   Body,
   Controller,
   Get,
+  Put,
   Param,
   Post,
   Delete,
@@ -35,6 +36,7 @@ import {
   ApplyRequest,
   CreatePRRequest,
   ConnectRepoRequest,
+  WriteFileRequest,
 } from '@aion/agent-contracts';
 import { Public, CurrentUser } from '../../core/auth';
 import type { CurrentUser as CurrentUserType } from '../../core/auth';
@@ -346,6 +348,71 @@ export class AgentPlatformController {
       workspaceId,
       body.message.trim()
     );
+  }
+
+  // ─── GET /api/agent/v1/repo/tree/:workspaceId ──────────────────────────
+
+  @Get('repo/tree/:workspaceId')
+  async getFileTree(
+    @Param('workspaceId') workspaceId: string,
+    @Query('docId') docId?: string
+  ) {
+    try {
+      return await this.agentService.getFileTree(workspaceId, docId);
+    } catch (err) {
+      const msg = (err as Error).message ?? String(err);
+      throw new BadRequestException(`File tree failed: ${msg}`);
+    }
+  }
+
+  // ─── GET /api/agent/v1/repo/file/:workspaceId ────────────────────────
+
+  @Get('repo/file/:workspaceId')
+  async readRepoFile(
+    @Param('workspaceId') workspaceId: string,
+    @Query('path') filePath: string,
+    @Query('docId') docId?: string
+  ) {
+    if (!filePath?.trim()) {
+      throw new BadRequestException('path query param is required');
+    }
+    try {
+      return await this.agentService.readRepoFile(
+        workspaceId,
+        filePath.trim(),
+        docId
+      );
+    } catch (err) {
+      const msg = (err as Error).message ?? String(err);
+      if (msg.includes('ENOENT')) {
+        throw new NotFoundException(`File not found: ${filePath}`);
+      }
+      throw new BadRequestException(`Read file failed: ${msg}`);
+    }
+  }
+
+  // ─── PUT /api/agent/v1/repo/file/:workspaceId ────────────────────────
+
+  @Put('repo/file/:workspaceId')
+  async writeRepoFile(
+    @Param('workspaceId') workspaceId: string,
+    @Body() body: unknown
+  ) {
+    const parsed = WriteFileRequest.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.flatten());
+    }
+    try {
+      return await this.agentService.writeRepoFile(
+        workspaceId,
+        parsed.data.path,
+        parsed.data.content,
+        parsed.data.docId
+      );
+    } catch (err) {
+      const msg = (err as Error).message ?? String(err);
+      throw new BadRequestException(`Write file failed: ${msg}`);
+    }
   }
 
   // ─── POST /api/agent/v1/chat — Interactive chat with persistence ─────

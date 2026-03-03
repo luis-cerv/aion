@@ -1,7 +1,7 @@
 /**
  * Agent Platform Panel — sidebar tab with chat + structured analysis tabs.
  */
-import { Scrollable } from '@affine/component';
+import { Modal, Scrollable } from '@affine/component';
 import { extractMarkdownFromDoc } from '@affine/core/blocksuite/ai/utils/extract';
 import { useLiveData, useService } from '@toeverything/infra';
 import {
@@ -16,6 +16,7 @@ import { DocService } from '../../doc';
 import { WorkspaceService } from '../../workspace';
 import { AgentPlatformService } from '../services/agent';
 import * as styles from './styles.css';
+import { CodeExplorerPage } from './code-explorer/code-explorer-page';
 import type {
   AgentStep,
   ChatMessage,
@@ -47,27 +48,44 @@ const TAB_LABELS: Record<Tab, string> = {
 
 export const AgentPanel = memo(function AgentPanel() {
   const [activeTab, setActiveTab] = useState<Tab>('chat');
+  const [showExplorer, setShowExplorer] = useState(false);
+
+  const openExplorer = useCallback(() => setShowExplorer(true), []);
+  const closeExplorer = useCallback(() => setShowExplorer(false), []);
 
   return (
-    <div className={styles.agentPanel}>
-      {/* Tab bar */}
-      <div className={styles.buttonRow}>
-        {(['chat', 'analysis', 'changes', 'audit'] as Tab[]).map((tab) => (
-          <button
-            key={tab}
-            className={activeTab === tab ? styles.actionButton : styles.secondaryButton}
-            onClick={() => setActiveTab(tab)}
-          >
-            {TAB_LABELS[tab]}
-          </button>
-        ))}
+    <>
+      <div className={styles.agentPanel}>
+        {/* Tab bar */}
+        <div className={styles.buttonRow}>
+          {(['chat', 'analysis', 'changes', 'audit'] as Tab[]).map((tab) => (
+            <button
+              key={tab}
+              className={activeTab === tab ? styles.actionButton : styles.secondaryButton}
+              onClick={() => setActiveTab(tab)}
+            >
+              {TAB_LABELS[tab]}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === 'chat' && <ChatTab />}
+        {activeTab === 'analysis' && <AnalysisTab />}
+        {activeTab === 'changes' && <ChangesTab onOpenExplorer={openExplorer} />}
+        {activeTab === 'audit' && <AuditTab />}
       </div>
 
-      {activeTab === 'chat' && <ChatTab />}
-      {activeTab === 'analysis' && <AnalysisTab />}
-      {activeTab === 'changes' && <ChangesTab />}
-      {activeTab === 'audit' && <AuditTab />}
-    </div>
+      <Modal
+        open={showExplorer}
+        onOpenChange={setShowExplorer}
+        fullScreen
+        animation="fadeScaleTop"
+        withoutCloseButton
+        contentOptions={{ style: { padding: 0, overflow: 'hidden' } }}
+      >
+        <CodeExplorerPage onClose={closeExplorer} />
+      </Modal>
+    </>
   );
 });
 
@@ -1235,7 +1253,7 @@ interface RepoChanges {
   branch: string;
 }
 
-function ChangesTab() {
+function ChangesTab({ onOpenExplorer }: { onOpenExplorer: () => void }) {
   const agentService = useService(AgentPlatformService);
   const workspaceService = useService(WorkspaceService);
   const docService = useService(DocService);
@@ -1317,6 +1335,9 @@ function ChangesTab() {
           <span className={styles.sectionTitle} style={{ flex: 1 }}>
             Branch: <span style={{ fontFamily: 'monospace', textTransform: 'none' }}>{changes.branch || '(detached)'}</span>
           </span>
+          <button className={styles.secondaryButton} onClick={onOpenExplorer} style={{ padding: '3px 10px', fontSize: '11px' }}>
+            Code Explorer
+          </button>
           <button className={styles.secondaryButton} onClick={handleRefresh} disabled={loading} style={{ padding: '3px 10px', fontSize: '11px' }}>
             {loading ? '...' : 'Refresh'}
           </button>

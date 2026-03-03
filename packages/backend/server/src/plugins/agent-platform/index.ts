@@ -7,6 +7,7 @@ import { AgentStorageService } from './storage/prisma.adapter';
 import { ClaudeCodeAdapter } from './llm/claude-code.adapter';
 import { RepoAdapter } from './repo/repo.adapter';
 import { RepoSecurityService } from './repo/security';
+import { FileExplorerService } from './repo/file-explorer.service';
 import { GitHubAppService } from './github/github-app.service';
 import { CommentAgentJob } from './comment-agent.job';
 
@@ -18,6 +19,7 @@ import { CommentAgentJob } from './comment-agent.job';
     ClaudeCodeAdapter,
     RepoAdapter,
     RepoSecurityService,
+    FileExplorerService,
     GitHubAppService,
     CommentAgentJob,
   ],
