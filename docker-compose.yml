@@ -28,7 +28,15 @@ services:
       POSTGRES_INITDB_ARGS: '--data-checksums'
       POSTGRES_HOST_AUTH_METHOD: ${DB_AUTH_METHOD:-trust}
     healthcheck:
-      test: ['CMD', 'pg_isready', '-U', '${DB_USERNAME:-affine}', '-d', '${DB_DATABASE:-affine}']
+      test:
+        [
+          'CMD',
+          'pg_isready',
+          '-U',
+          '${DB_USERNAME:-affine}',
+          '-d',
+          '${DB_DATABASE:-affine}',
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -102,7 +110,6 @@ services:
       MAILER_SECURE: 'false'
 
       # ── Agent Platform ──
-      AGENT_DB_PATH: /data/agent-platform
       AGENT_MODEL: ${AGENT_MODEL:-}
       ALLOWED_REPOS: ${ALLOWED_REPOS:-}
       ALLOWED_PATHS: ${ALLOWED_PATHS:-}
@@ -114,7 +121,6 @@ services:
     volumes:
       - upload_data:/root/.affine/storage
       - config_data:/root/.affine/config
-      - agent_data:/data/agent-platform
       # Mount local repos so Agent Platform can access them
       - ${REPOS_PATH:-./repos}:/repos:rw
     depends_on:
@@ -131,4 +137,3 @@ volumes:
   mailpit_data:
   upload_data:
   config_data:
-  agent_data:

@@ -29,6 +29,9 @@ import type {
   GitHubStatusResponse,
   WorkspaceRepoConnection,
   WorkspaceRule,
+  FileTreeResponse,
+  FileContent,
+  WriteFileResponse,
 } from '@aion/agent-contracts';
 
 export class AgentPlatformStore extends Store {
@@ -458,6 +461,48 @@ export class AgentPlatformStore extends Store {
   async removeRule(workspaceId: string, ruleId: string): Promise<void> {
     await this.apiCall('DELETE', `/workspaces/${workspaceId}/rules/${ruleId}`);
     this.loadWorkspaceRules(workspaceId);
+  }
+
+  // ─── File Explorer ─────────────────────────────────────────────────────
+  readonly fileTree$ = new LiveData<FileTreeResponse | null>(null);
+  readonly fileTreeLoading$ = new LiveData<boolean>(false);
+
+  async loadFileTree(workspaceId: string, docId?: string): Promise<FileTreeResponse> {
+    this.fileTreeLoading$.next(true);
+    try {
+      const qs = docId ? `?docId=${encodeURIComponent(docId)}` : '';
+      const data = await this.fetch('GET', `/repo/tree/${workspaceId}${qs}`);
+      this.fileTree$.next(data);
+      return data;
+    } catch (err) {
+      this.fileTree$.next(null);
+      throw err;
+    } finally {
+      this.fileTreeLoading$.next(false);
+    }
+  }
+
+  async readRepoFile(
+    workspaceId: string,
+    filePath: string,
+    docId?: string
+  ): Promise<FileContent> {
+    const qs = new URLSearchParams({ path: filePath });
+    if (docId) qs.set('docId', docId);
+    return this.fetch('GET', `/repo/file/${workspaceId}?${qs.toString()}`);
+  }
+
+  async writeRepoFile(
+    workspaceId: string,
+    filePath: string,
+    content: string,
+    docId: string
+  ): Promise<WriteFileResponse> {
+    return this.fetch('PUT', `/repo/file/${workspaceId}`, {
+      path: filePath,
+      content,
+      docId,
+    });
   }
 
   // ─── Repo changes ──────────────────────────────────────────────────────

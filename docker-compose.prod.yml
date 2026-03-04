@@ -1,0 +1,109 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# AION — Production Docker Compose
+#
+# Usage:
+#   cp .env.prod.example .env       # configure environment
+#   docker compose -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.prod.yml logs -f aion
+#
+# Services:
+#   - redis         : Redis cache/sessions
+#   - aion_migration: DB migration job (runs once)
+#   - aion          : Main AION server (AFFiNE + Agent Platform)
+#   - caddy         : Reverse proxy with automatic HTTPS (Let's Encrypt)
+#
+# Database: external (DigitalOcean Managed PostgreSQL)
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  # ─── Redis ───────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: aion_redis
+    healthcheck:
+      test: ['CMD', 'redis-cli', '--raw', 'incr', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ─── Database Migration ─────────────────────────────────────────────────
+  aion_migration:
+    build: .
+    container_name: aion_migration
+    command: ['sh', '-c', 'mkdir -p ~/.affine/config && npx prisma migrate deploy']
+    environment:
+      REDIS_SERVER_HOST: redis
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      AFFINE_INDEXER_ENABLED: 'false'
+    volumes:
+      - upload_data:/root/.affine/storage
+      - ./config:/root/.affine/config
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ─── AION Server (AFFiNE + Agent Platform) ──────────────────────────────
+  aion:
+    build: .
+    container_name: aion_server
+    environment:
+      # ── Core AFFiNE ──
+      REDIS_SERVER_HOST: redis
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      AFFINE_SERVER_EXTERNAL_URL: https://${DOMAIN:?DOMAIN is required}
+      AFFINE_SERVER_HTTPS: 'true'
+      AFFINE_INDEXER_ENABLED: 'false'
+
+      # ── Mail (optional — configure for invite emails) ──
+      MAILER_HOST: ${MAILER_HOST:-}
+      MAILER_PORT: ${MAILER_PORT:-587}
+      MAILER_SENDER: ${MAILER_SENDER:-}
+      MAILER_USER: ${MAILER_USER:-}
+      MAILER_PASSWORD: ${MAILER_PASSWORD:-}
+      MAILER_SECURE: ${MAILER_SECURE:-true}
+
+      # ── Agent Platform ──
+      AGENT_MODEL: ${AGENT_MODEL:-}
+      ALLOWED_REPOS: ${ALLOWED_REPOS:-}
+      ALLOWED_PATHS: ${ALLOWED_PATHS:-}
+      FORBIDDEN_PATHS: ${FORBIDDEN_PATHS:-}
+      MAX_PATCH_BYTES: ${MAX_PATCH_BYTES:-1000000}
+
+      # ── Claude Code auth ──
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?ANTHROPIC_API_KEY is required}
+
+      # ── Google OAuth (configured in config/config.json) ──
+    volumes:
+      - upload_data:/root/.affine/storage
+      - ./config:/root/.affine/config
+      - ${REPOS_PATH:-./repos}:/repos:rw
+    depends_on:
+      redis:
+        condition: service_healthy
+      aion_migration:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # ─── Caddy (HTTPS reverse proxy) ────────────────────────────────────────
+  caddy:
+    image: caddy:2-alpine
+    container_name: aion_caddy
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN is required}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - aion
+    restart: unless-stopped
+
+volumes:
+  upload_data:
+  caddy_data:
+  caddy_config:

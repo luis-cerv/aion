@@ -135,6 +135,13 @@ export class AgentPlatformService extends Service {
   addRule(workspaceId: string, docId: string, docTitle?: string) { return this.store.addRule(workspaceId, docId, docTitle); }
   removeRule(workspaceId: string, ruleId: string) { return this.store.removeRule(workspaceId, ruleId); }
 
+  // File Explorer
+  get fileTree$() { return this.store.fileTree$; }
+  get fileTreeLoading$() { return this.store.fileTreeLoading$; }
+  loadFileTree(workspaceId: string, docId?: string) { return this.store.loadFileTree(workspaceId, docId); }
+  readRepoFile(workspaceId: string, filePath: string, docId?: string) { return this.store.readRepoFile(workspaceId, filePath, docId); }
+  writeRepoFile(workspaceId: string, filePath: string, content: string, docId: string) { return this.store.writeRepoFile(workspaceId, filePath, content, docId); }
+
   // Repo changes
   get repoChanges$() { return this.store.repoChanges$; }
   get repoChangesLoading$() { return this.store.repoChangesLoading$; }
